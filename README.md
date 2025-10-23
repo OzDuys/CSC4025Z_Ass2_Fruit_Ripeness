@@ -5,8 +5,8 @@ This repository contains the baseline experiments for Assignment 2 on training n
 ## Repository Structure
 
 - `Dataset/` – dataset description, download helper, and (ignored) storage location for downloaded data  
-- `Example Scripts/` – reference code supplied with the assignment brief  
-- `notebooks/` – Jupyter notebooks (baseline PyTorch training notebook added)  
+- `Example Scripts/` – reference training code from people on kaggle training on the same dataset
+- `training notebooks/` – Jupyter notebooks for training
 - `requirements.txt` – Python dependencies for local development or Colab  
 - `README.md` – project setup and usage guide
 
@@ -35,7 +35,7 @@ This repository contains the baseline experiments for Assignment 2 on training n
    ```bash
    jupyter lab
    ```
-   The baseline notebook lives in `notebooks/baseline_pytorch.ipynb`.
+   The baseline notebook lives in `training notebooks/baseline_pytorch.ipynb`.
 
 ## Running on Google Colab
 
@@ -45,7 +45,7 @@ This repository contains the baseline experiments for Assignment 2 on training n
    !pip install -r requirements.txt
    ```
 3. Run `Dataset/download_dataset.py` to fetch the Kaggle data inside Colab (ensure your Kaggle API token is available).  
-4. Open `notebooks/baseline_pytorch.ipynb` and execute the cells. The notebook automatically detects and uses a GPU if available.
+4. Open `training notebooks/baseline_pytorch.ipynb` and execute the cells. The notebook automatically detects and uses a GPU if available.
 
 ### Quick Colab Workflow
 
