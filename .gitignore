@@ -1,0 +1,30 @@
+.DS_Store
+.venv/
+venv/
+env/
+.env
+.env.*
+
+__pycache__/
+*.py[cod]
+*.so
+*.dylib
+
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+
+# Ignore downloaded datasets and large artifacts
+Dataset/fruit_ripeness_dataset/
+Dataset/raw/
+Dataset/processed/
+data/
+outputs/
+checkpoints/
+
+# Kaggle credentials
+kaggle.json
+
+# VS Code and other editor settings
+.vscode/
+.idea/
