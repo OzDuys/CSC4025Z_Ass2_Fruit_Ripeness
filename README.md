@@ -47,6 +47,16 @@ This repository contains the baseline experiments for Assignment 2 on training n
 3. Run `Dataset/download_dataset.py` to fetch the Kaggle data inside Colab (ensure your Kaggle API token is available).  
 4. Open `notebooks/baseline_pytorch.ipynb` and execute the cells. The notebook automatically detects and uses a GPU if available.
 
+### Quick Colab Workflow
+
+1. Open [Google Colab](https://colab.research.google.com) and choose **File → Upload Notebook…** (or **GitHub tab → paste repo URL**).  
+2. If you upload the notebook directly, also upload `README.md` and `requirements.txt` or clone via `!git clone`.  
+3. Run the first cell to install dependencies (this may take a few minutes).  
+4. When prompted, upload your Kaggle API credentials (`kaggle.json` or similarly named). The notebook renames and stores it under `~/.kaggle/`.  
+5. Execute the dataset download cell; progress bars will show copying/extraction status.  
+6. Run the remaining cells sequentially to train, visualise metrics, evaluate on the test set, and optionally save checkpoints.  
+7. To resume later, rerun the dependency, credential, and dataset cells before training.
+
 ## Next Steps
 
 - Iterate on model architectures, data augmentation, and training schedules in additional notebooks.  
