@@ -24,6 +24,7 @@ checkpoints/
 
 # Kaggle credentials
 kaggle.json
+Kaggle Settings.json
 
 # VS Code and other editor settings
 .vscode/
