@@ -21,6 +21,8 @@ Dataset/processed/
 data/
 outputs/
 checkpoints/
+datasetcopy/
+training notebooks/artefacts/knn_model.pkl
 
 # Kaggle credentials
 kaggle.json
