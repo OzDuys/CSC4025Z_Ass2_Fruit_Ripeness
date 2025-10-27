@@ -8,15 +8,15 @@ Three baseline approaches to compare against the CNN (84.5% accuracy):
 
 | Baseline | Accuracy (Expected) | Features | Classifier | Notebook |
 |----------|---------------------|----------|------------|----------|
-| **kNN** | 74.4% | Raw pixels (64×64 RGB) | K-Nearest Neighbors (K=1) | `baseline_knn.ipynb` |
-| **HOG + LogReg** | ~60-75% | HOG features (grayscale) | Logistic Regression | `baseline_hog_linear.ipynb` |
-| **HOG + SVM** | ~60-75% | HOG features (grayscale) | Linear SVM | `baseline_hog_linear.ipynb` |
+| **kNN** | 74.4% | Raw pixels (64×64 RGB) | K-Nearest Neighbors (K=1) | `training notebooks/Baseline Algorithms/knn/baseline_knn.ipynb` |
+| **HOG + LogReg** | ~60-75% | HOG features (grayscale) | Logistic Regression | `training notebooks/Baseline Algorithms/hog/baseline_hog_linear.ipynb` |
+| **HOG + SVM** | ~60-75% | HOG features (grayscale) | Linear SVM | `training notebooks/Baseline Algorithms/hog/baseline_hog_linear.ipynb` |
 
 ---
 
 ## Baseline 1: kNN (Raw Pixels)
 
-### File: `baseline_knn.ipynb`
+### File: `training notebooks/Baseline Algorithms/knn/baseline_knn.ipynb`
 
 **Method:**
 - Resize images to 64×64 RGB
@@ -59,7 +59,7 @@ Three baseline approaches to compare against the CNN (84.5% accuracy):
 
 ## Baseline 2: HOG + Linear Classifiers
 
-### File: `baseline_hog_linear.ipynb`
+### File: `training notebooks/Baseline Algorithms/hog/baseline_hog_linear.ipynb`
 
 **Method:**
 - Resize images to 128×128
@@ -200,8 +200,8 @@ Three baseline approaches to compare against the CNN (84.5% accuracy):
 
 ```
 training notebooks/
-├── baseline_knn.ipynb              # kNN baseline
-├── baseline_hog_linear.ipynb       # HOG + Linear classifiers
+├── training notebooks/Baseline Algorithms/knn/baseline_knn.ipynb              # kNN baseline
+├── training notebooks/Baseline Algorithms/hog/baseline_hog_linear.ipynb       # HOG + Linear classifiers
 ├── test_knn_on_image.py           # Standalone kNN test script
 ├── README_kNN_Testing.md          # kNN usage guide
 └── artefacts/
@@ -218,13 +218,13 @@ training notebooks/
 ## Quick Start
 
 ### Run kNN Baseline:
-1. Open `baseline_knn.ipynb`
+1. Open `training notebooks/Baseline Algorithms/knn/baseline_knn.ipynb`
 2. Run all cells (5-10 minutes)
 3. Results saved to `artefacts/knn_model.pkl`
 4. Test on new images: Section 10
 
 ### Run HOG Baseline:
-1. Open `baseline_hog_linear.ipynb`
+1. Open `training notebooks/Baseline Algorithms/hog/baseline_hog_linear.ipynb`
 2. Run all cells (10-15 minutes for feature extraction)
 3. Results saved to `artefacts/hog_linear_models.pkl`
 4. Compare Logistic Regression vs Linear SVM
