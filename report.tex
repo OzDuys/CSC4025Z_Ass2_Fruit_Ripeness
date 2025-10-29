@@ -19,7 +19,7 @@
 }
 
 % Graphics search paths (handles spaces in directory names on modern LaTeX)
-\graphicspath{{./}{training notebooks/cnn/}{training notebooks/Baseline Algorithms/knn/}{training notebooks/Baseline Algorithms/hog/}{results/40_epochs/}{results/figures/}}
+\graphicspath{{./}{Dataset/}{training notebooks/cnn/}{training notebooks/Baseline Algorithms/knn/}{training notebooks/Baseline Algorithms/hog/}{results/40_epochs/}{results/figures/}}
 
 % Readability tweaks
 \setlength{\parskip}{0.6em}
@@ -38,13 +38,13 @@
 \textbf{Application:} In commercial agriculture and packing facilities, this tool can be used to enable fast quality assessment and replace manual sorting. This reduces labour costs while improving throughput. Retail and grocery stores can use this tool for inventory management, ensuring only ripe products are shelved and identifying stock requiring removal or immediate sale to minimise food waste. The technology also benefits food processing industries by automating the selection of fruits at specific ripeness stages for different products (e.g. ripe bananas for smoothies versus unripe for longer-term retail).
 
 
-\textbf{Metrics:} We report accuracy for quick comparison and macro-F1 as the primary selection metric during tuning to weight classes equally. We additionally track balanced accuracy and per-class diagnostics (confusion matrices); CNN confusion matrices will be added in the remaining work.
+\textbf{Metrics:} We report accuracy for quick comparison and macro-F1 as the primary selection metric during tuning to weight classes equally. We additionally track balanced accuracy and per-class diagnostics (confusion matrices).
 
 \textbf{Ethics:} The system targets fruit imagery for quality assessment and does not process personal or sensitive data. Risks are primarily around over-reliance on automation in quality control; human oversight is recommended.
 
 \section{Dataset}
-The dataset contains images of bananas, apples, and oranges across unripe, ripe, and rotten states, organised by class folders \footnote{See \texttt{Dataset/dataset\_description.md}.}. Images are relatively consistent, which makes colour information a strong indicator for ripeness. Training and test sets were provided in the Kaggle dataset by \texttt{leftin} (updated 4 months ago)\footnote{\href{https://www.kaggle.com/datasets/leftin/fruit-ripeness-unripe-ripe-and-rotten}{https://www.kaggle.com/datasets/leftin/fruit-ripeness-unripe-ripe-and-rotten}} with 16,217 images and 3,739 respectively across all 9 classes. We also reserved 15\% of the training set as a validation split using a fixed random seed for reproducibility. The dataset has a relatively balanced distribution, and the full dataset split can be seen in table \ref{tab:dataset_split}.
-We standardise inputs to \(224\times224\) RGB. For training, light augmentations (random flips/rotations, colour jitter, optional random erasing) are used in tuning; validation/test use deterministic resizing and normalisation only.
+The dataset contains images of bananas, apples, and oranges across unripe, ripe, and rotten states, organised by class folders \footnote{See \texttt{Dataset/dataset\_description.md}.}. Images are relatively consistent, which makes colour information a strong indicator for ripeness. Training and test sets were provided in the Kaggle dataset by \texttt{leftin} (updated 4 months ago)\footnote{\href{https://www.kaggle.com/datasets/leftin/fruit-ripeness-unripe-ripe-and-rotten}{https://www.kaggle.com/datasets/leftin/fruit-ripeness-unripe-ripe-and-rotten}}. After an 85/15 split of the supplied training folder (seeded for reproducibility) we obtain 13,784 training images, 2,433 validation images, and 3,246 test images across the nine classes (Table~\ref{tab:dataset_split}).
+We standardise inputs to \(224\times224\) RGB. For training, light augmentations (random flips/rotations, colour jitter, optional random erasing) are used in tuning; validation and test use deterministic resizing and normalisation only—no stochastic augmentation is applied at evaluation time.
 
 \begin{figure}[H]
     \centering
@@ -63,7 +63,7 @@ Despite this strong performance, kNN has many practical limitations. The approac
 
 \begin{figure}[H]
   \centering
-  \img[width=0.4\linewidth]{baseline_knn_k_tuning.png}
+  \img[width=0.45\linewidth]{baseline_knn_k_tuning.png}
   \caption{kNN: effect of K on performance (expected trend).}
   \label{fig:knn-k}
 \end{figure}
@@ -97,18 +97,12 @@ The hyperparameters used in all three training runs were chosen to reflect a sta
 
 \section{Hyperparameter Tuning}
 \subsection{Methodology}
-We broadened our search beyond the three-layer \textbf{SimpleCNN} and adopted \textbf{macro-F1} as the primary selection metric (rather than accuracy) to weight classes equally. Hyper-parameter tuning was orchestrated in a Google Colab notebook using Weights\,&\,Biases (W\&B) sweeps. Each run trained for 15 epochs (chosen for a balance between convergence and compute). The objective maximised \emph{validation} macro-F1. The search space spans:
-\begin{itemize}
-  \item Architectures: simple CNN, ResNet-18, MobileNetV3-Small, EfficientNet-B0. All reported results are trained from scratch (no pretrained fine-tuning).
-  \item Optimisers: AdamW/Adam/SGD; scheduler: cosine; label smoothing; gradient clipping.
-  \item Data: image size, batch size, augmentation strengths (flip, rotation, colour jitter, random erasing).
-  \item Regularisation: dropout and weight decay.
-\end{itemize}
+We broadened our search beyond the three-layer \textbf{SimpleCNN} and adopted \textbf{macro-F1} as the primary selection metric (rather than accuracy) to weight classes equally. Hyper-parameter tuning was orchestrated in a Google Colab notebook using Weights\&Biases (W\&B) sweeps. Each run trained for 15 epochs (chosen for a balance between convergence and compute). The objective maximised \emph{validation} macro-F1. The search space spans: Architectures, Optimisers, Data, and Regularisation. The sweep ranges searched can be seen below.
 
-\subsection{Architectures (brief)}
+\subsection{Architectures}
 \textbf{SimpleCNN}\; A lightweight baseline with three convolution\,+\,pooling blocks (32/64/128 channels) and a small fully connected head. It learns colour and texture features directly without specialised blocks, trading ultimate accuracy for simplicity and speed.
 
-\textbf{ResNet-18}\; A residual network with identity shortcuts that bypass one or more layers, enabling stable optimisation of deeper models via residual learning. The 18-layer variant uses BasicBlocks with two 3\,\(\times\)\,3 convolutions per block and a final linear classifier.\footnote{He et al., Deep Residual Learning for Image Recognition, arXiv:1512.03385}
+\textbf{ResNet-18}\; A residual network with identity shortcuts that bypass one or more layers, enabling stable optimisation of deeper models via residual learning. The 18-layer variant uses BasicBlocks with two 3\,\(\times\)\,3 convolutions per block and a final linear classifier; we insert a dropout layer (rate from the sweep configuration) between the global average pooling output and the classifier head.\footnote{He et al., Deep Residual Learning for Image Recognition, arXiv:1512.03385}
 
 \textbf{MobileNetV3-Small}\; An efficient architecture for mobile settings built from inverted residual bottlenecks with depthwise separable convolutions, squeeze-and-excitation (SE), and the \textit{h-swish}/\textit{h-sigmoid} activations. It balances accuracy and latency with a compact parameter footprint.\footnote{Howard et al., Searching for MobileNetV3, arXiv:1905.02244}
 
@@ -133,6 +127,24 @@ mobilenetv3-s & 3.84e-4 & 1.31e-3 & 48 & 0.178 & 0.00 & 0.00 & 0.944 \\
 \end{tabular}
 \end{center}
 
+\paragraph{Sweep ranges.}
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Hyper-parameter & Range / Values & Notes \\
+\midrule
+Learning rate & $1\times10^{-5}$ -- $3\times10^{-3}$ & Log-uniform (AdamW/Adam/SGD) \\
+Weight decay & $1\times10^{-6}$ -- $1\times10^{-2}$ & Log-uniform \\
+Dropout & 0.10 -- 0.60 & Applied to classifier / head \\
+Batch size & \{16, 32, 48, 64\} & Limited by GPU memory \\
+Colour jitter & \{0.0, 0.15, 0.30\} & Train augmentation only \\
+Random erasing & \{0.0, 0.10, 0.25\} & Applied after colour jitter \\
+Rotation & \{0, 10\degree\} & Train augmentation only \\
+Optimiser & \{AdamW, Adam, SGD\} & With cosine or plateau scheduler \\
+\bottomrule
+\end{tabular}
+\end{center}
+
 ResNet-18 is the strongest (best test macro-F1 0.985; test accuracy 0.988), closely followed by EfficientNet-B0 (best macro-F1 0.982). SimpleCNN sweeps now peak around macro-F1 $\approx 0.901$, narrowing the gap to MobileNetV3-Small (best $\approx 0.944$).
 
 \paragraph{Architecture-level outcomes.}
@@ -147,7 +159,7 @@ ResNet-18 is the strongest (best test macro-F1 0.985; test accuracy 0.988), clos
   \centering
   \begin{subfigure}{0.48\linewidth}
     \centering
-    \img[width=\linewidth]{val_macro_f1_for_each_arch_in_training.png}
+    \img[width=\linewidth]{val_macro_f1_ for_each_arch_in_training.png}
     \caption{Validation macro-F1}
     \label{fig:val_macro_f1}
   \end{subfigure}
@@ -176,7 +188,7 @@ The curves above are highly correlated: across architectures, validation accurac
 
 \begin{figure}[H]
   \centering
-  \img[width=0.7\linewidth]{param_importance_basic_cnn.png}
+  \img[width=0.8\linewidth]{param_importance_basic_cnn.png}
   \caption{Parameter importance for SimpleCNN sweep (macro-F1).}
   \label{fig:param-importance-simplecnn}
 \end{figure}
@@ -185,7 +197,7 @@ The curves above are highly correlated: across architectures, validation accurac
 
 \begin{figure}[H]
   \centering
-  \img[width=0.8\linewidth]{results/figures/roc_sweep.png}
+  \img[width=0.5\linewidth]{roc_sweep.png}
   \caption{Macro-averaged ROC curves across the sweep. The selected run (still-sweep-1) appears in red; other runs are shown in grey.}
   \label{fig:best-roc}
 \end{figure}
@@ -209,9 +221,9 @@ kNN (raw RGB, K=1) & 0.743& 74.4\% & Strong colour signal \\
 \midrule
 \multicolumn{4}{l}{\textit{Deep Learning Models: 3 Layer CNN, Default Hyper-parameters}} \\[2pt]
 \midrule
-CNN baseline (5 epochs) & -- & 72.3\% & Three-block SimpleCNN \\
-CNN baseline (20 epochs) & -- & 84.5\% & Three-block SimpleCNN \\
-CNN baseline (40 epochs) & -- & 92.96\% & Three-block SimpleCNN \\
+CNN baseline (5 epochs) & 0.704 & 72.3\% & Three-block SimpleCNN \\
+CNN baseline (20 epochs) & 0.836 & 84.5\% & Three-block SimpleCNN \\
+CNN baseline (40 epochs) & 0.918 & 92.96\% & Three-block SimpleCNN \\
 \midrule
 \multicolumn{4}{l}{\textit{Deep Learning Models: Hyper-parameter Tuned}} \\[2pt]
 \midrule
@@ -222,13 +234,14 @@ ResNet-18 (15 epochs) & \textbf{0.985} & \textbf{98.8\%} & Best Hyper-parameters
 \bottomrule
 \end{tabular}
 \end{center}
-Per-class precision/recall/F1 and confusion matrices for the selected model will be added.
+\smallskip
+\noindent\textit{Note.} Macro-F1 values for the baseline SimpleCNN runs are computed from the held-out test set using the saved training logs; classical baselines use scikit-learn's classification report.
 
 \section{Analysis}
 \textbf{Baselines:} kNN outperforms HOG because colour strongly signals ripeness, whereas HOG discards colour by design.\newline
 \textbf{CNN vs baselines:} Learned features that combine colour and texture outperform raw-pixel matching by a large margin; the selected ResNet-18 adds $\approx$24 points of absolute accuracy over kNN.\newline
 \textbf{Hyperparameters:} Stronger regularisation (dropout $>\!0.4$) benefits ResNet/EfficientNet; SimpleCNN gains most from moderate colour jitter and restrained dropout.\newline
-\textbf{Error patterns:} Confusions are expected between adjacent ripeness stages (e.g., ripe vs. slightly unripe/rotting). We summarise this with the aggregated confusion matrix (Figure~\ref{fig:confusion_matrix_all_hyperparam_runs}) and will add a classification report for the selected model.\\
+\textbf{Error patterns:} Confusions are expected between adjacent ripeness stages (e.g., ripe vs. slightly unripe/rotting). We summarise this with the aggregated confusion matrix (Figure~\ref{fig:confusion_matrix_all_hyperparam_runs}); the per-class precision/recall table appears in Appendix~\ref{tab:classification-report}.\\
 \textbf{ROC curves:} Figure~\ref{fig:best-roc} overlays per-class ROC curves for all runs, with the selected configuration highlighted. Its near-vertical rise confirms strong performance while the log-scaled FPR axis reveals subtle differences among high-performing runs.\\
 
 Across runs, the largest errors occur for the \emph{unripe} classes across fruits. This aligns with the data (Figure~\ref{fig:dataset-sample-images}): many unripe examples show small fruits on branches with more background and weaker colour cues. Those factors reduce signal-to-noise and make classification harder, explaining the consistent pattern across models.
@@ -244,7 +257,7 @@ Across runs, the largest errors occur for the \emph{unripe} classes across fruit
 
 
 \section{Reproducibility}
-See \texttt{README.md} for environment setup and dataset download instructions. Notebooks under \texttt{training notebooks/} reproduce baselines and the CNN experiments;\\ \texttt{training notebooks/cnn/hyperparam\_tuning/} contains the W\&B hyper-parameter sweep setup and analysis. Final test predictions and the best checkpoint for the selected model will be included in the submission package.
+See \texttt{README.md} for environment setup and dataset download instructions. Notebooks under \texttt{training notebooks/} reproduce baselines and the CNN experiments;\\ \texttt{training notebooks/cnn/hyperparam\_tuning/} contains the W\&B hyper-parameter sweep setup and analysis. The submission bundle includes step-by-step reproduction instructions, the selected model checkpoint, and the CSV of final test predictions produced by that checkpoint.
 
 \section*{References}
 \begin{itemize}
@@ -257,7 +270,33 @@ See \texttt{README.md} for environment setup and dataset download instructions. 
 \section*{Acknowledgements}
 We acknowledge use of PyTorch, torchvision, scikit-learn, scikit-image, and Weights and Biases. Baseline methodology and configuration details are documented in the repository under \texttt{training notebooks/}.
 
+\newpage
 \appendix
+\section{Classification Report (ResNet-18 still-sweep-1)}
+\begin{table}[h]
+\centering
+\caption{Per-class precision/recall/F1 on the test set for the selected ResNet-18 (from W\&B export).}
+\label{tab:classification-report}
+\begin{tabular}{lccc}
+\hline
+\textbf{Class} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} \\
+\hline
+Fresh Apples & 0.99 & 1.00 & 0.99 \\
+Fresh Banana & 0.99 & 0.99 & 0.99 \\
+Fresh Oranges & 0.99 & 0.99 & 0.99 \\
+Rotten Apples & 0.98 & 0.99 & 0.99 \\
+Rotten Banana & 1.00 & 0.98 & 0.99 \\
+Rotten Oranges & 0.99 & 0.98 & 0.99 \\
+Unripe Apple & 0.97 & 0.95 & 0.96 \\
+Unripe Banana & 0.98 & 0.95 & 0.96 \\
+Unripe Orange & 0.97 & 0.94 & 0.95 \\
+\hline
+\textbf{Macro Average} & \textbf{0.99} & \textbf{0.98} & \textbf{0.98} \\
+\textbf{Weighted Average} & \textbf{0.99} & \textbf{0.99} & \textbf{0.99} \\
+\hline
+\end{tabular}
+\end{table}
+
 \section{Dataset}
 \begin{table}[h]
 \centering
