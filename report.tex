@@ -10,107 +10,185 @@
 \usepackage{booktabs}
 \usepackage{xcolor}
 \usepackage{hyperref}
+\usepackage{subcaption}
 \hypersetup{colorlinks=true, linkcolor=black, urlcolor=blue, citecolor=blue}
 
+% Safe image include: shows a placeholder box if file is missing
+\newcommand{\img}[2][]{%
+  \IfFileExists{#2}{\includegraphics[#1]{#2}}{\fbox{\parbox[c][3cm][c]{0.9\linewidth}{\centering Image placeholder: #2}}}%
+}
+
 % Graphics search paths (handles spaces in directory names on modern LaTeX)
-\graphicspath{{./}{training notebooks/cnn/}{training notebooks/Baseline Algorithms/knn/}{training notebooks/Baseline Algorithms/hog/}{results/40_epochs/}}
+\graphicspath{{./}{training notebooks/cnn/}{training notebooks/Baseline Algorithms/knn/}{training notebooks/Baseline Algorithms/hog/}{results/40_epochs/}{results/figures/}}
 
 % Readability tweaks
 \setlength{\parskip}{0.6em}
 \setlength{\parindent}{0pt}
 
 \title{Fruit Ripeness Classification with Convolutional Neural Networks\\\large CSC4025Z: Assignment 2}
-\author{Group: [Insert student numbers]\thanks{Code and artefacts: see repository README.}}
+\author{Group: Max Elkington (ELKMAX001), Oscar Duys (DYSPIE002),\\ Catalina Thomson (ALTCAT001)}
 \date{\today}
-
+    
 \begin{document}
 \maketitle
 
-\begin{abstract}
-We address a 9-class image classification task: predicting fruit ripeness class across three fruit types (banana, apple, orange) and three ripeness states (unripe, ripe, rotten). We implemented classical baselines (k-Nearest Neighbours on raw pixels; HOG features with linear classifiers) and a convolutional neural network (CNN) baseline. The strongest current result is a CNN trained for 20 epochs achieving test accuracy of 84.5\%, outperforming kNN at 74.4\%. We describe the dataset, problem formulation, models, training setup, and analysis. Hyperparameter tuning methodology is in place; runs are in progress and final tuned results will be added.
-\end{abstract}
-
 \section{Problem Formulation}
-\textbf{Task:} Multi-class classification with 9 classes (fruit type \(\times\) ripeness state). Inputs are RGB images; outputs are discrete class labels. The intended application is automated fruit quality detection and sorting.
+\textbf{Task:} Multi-class image classification with 9 classes (fruit type \(\times\) ripeness state). Inputs are RGB images; outputs are discrete class labels. The intended application is automated fruit quality detection and sorting.
 
-\textbf{Dataset:} The dataset contains images of bananas, apples, and oranges across unripe, ripe, and rotten states, organised by class folders and suitable for supervised learning\footnote{See \texttt{Dataset/dataset\_description.md}.}. Images are relatively consistent, which makes color information a strong signal for ripeness.
+\textbf{Application:} In commercial agriculture and packing facilities, this tool can be used to enable fast quality assessment and replace manual sorting. This reduces labour costs while improving throughput. Retail and grocery stores can use this tool for inventory management, ensuring only ripe products are shelved and identifying stock requiring removal or immediate sale to minimise food waste. The technology also benefits food processing industries by automating the selection of fruits at specific ripeness stages for different products (e.g. ripe bananas for smoothies versus unripe for longer-term retail).
 
-\textbf{Data splits:} Training and test folders are provided by the dataset. We reserve a validation split from the training data (default 15\%) using a fixed random seed for reproducibility.
 
 \textbf{Metrics:} We report accuracy for quick comparison and macro-F1 as the primary selection metric during tuning to weight classes equally. We additionally track balanced accuracy and per-class diagnostics (confusion matrices); CNN confusion matrices will be added in the remaining work.
 
 \textbf{Ethics:} The system targets fruit imagery for quality assessment and does not process personal or sensitive data. Risks are primarily around over-reliance on automation in quality control; human oversight is recommended.
 
 \section{Dataset}
-A short description is provided by the dataset authors:\newline
-``This dataset includes images of tropical fruits at different ripeness stages ... images are organized by category and can be used directly for classification tasks like training a CNN or MobileNet model.''\newline
-We standardise inputs to \(224\times224\) RGB. For training, light augmentations (random flips/rotations, color jitter, optional random erasing) are used in tuning; validation/test use deterministic resizing and normalisation only.
-
-\section{Baselines}
-We implemented two complementary non-neural baselines; configuration and rationale follow classical computer vision practice.
-
-\subsection{k-Nearest Neighbours (raw pixels)}
-Images are resized to \(64\times64\) RGB, flattened, and compared with Euclidean distance. The best-performing configuration uses \(K=1\). Test accuracy: \textbf{74.4\%}. This performs well given consistent imagery and the importance of color cues.
+The dataset contains images of bananas, apples, and oranges across unripe, ripe, and rotten states, organised by class folders \footnote{See \texttt{Dataset/dataset\_description.md}.}. Images are relatively consistent, which makes colour information a strong indicator for ripeness. Training and test sets were provided in the Kaggle dataset by \texttt{leftin} (updated 4 months ago)\footnote{\href{https://www.kaggle.com/datasets/leftin/fruit-ripeness-unripe-ripe-and-rotten}{https://www.kaggle.com/datasets/leftin/fruit-ripeness-unripe-ripe-and-rotten}} with 16,217 images and 3,739 respectively across all 9 classes. We also reserved 15\% of the training set as a validation split using a fixed random seed for reproducibility. The dataset has a relatively balanced distribution, and the full dataset split can be seen in table \ref{tab:dataset_split}.
+We standardise inputs to \(224\times224\) RGB. For training, light augmentations (random flips/rotations, colour jitter, optional random erasing) are used in tuning; validation/test use deterministic resizing and normalisation only.
 
 \begin{figure}[H]
-  \centering
-  \includegraphics[width=0.7\linewidth]{baseline_knn_confusion_matrix.png}
-  \caption{kNN baseline: confusion matrix on test set.}
-  \label{fig:knn-conf}
+    \centering
+    \img[width=0.95\linewidth]{dataset_samples.png}
+    \caption{Sample Images from Kaggle dataset. Each row is a different class.}
+    \label{fig:dataset-sample-images}
 \end{figure}
 
+\section{Baselines}
+To evaluate the effectiveness of our CNN approach, we implemented two complementary baseline methods representing different feature extraction philosophies: k-Nearest Neighbours on raw pixels and HOG features with linear classifiers.
+
+\subsection{k-Nearest Neighbours}
+
+Our first baseline employs k-Nearest Neighbours (kNN), a distance-based classifier that stores all training images and classifies new images by majority vote among the k nearest neighbours in colour pixel space. We resized images to 64×64 pixels and flattened them into 12,288-dimensional vectors (64×64×3 RGB channels), testing k values from 1 to 20. Remarkably, kNN achieved 74.4\% accuracy with k=1, far exceeding typical raw pixel baseline performance of 30–50\%. This success stems from the dataset's favourable characteristics across most of the dataset: studio-quality images with consistent backgrounds, centred framing, and uniform lighting create well-separated clusters in pixel space, while ripeness states exhibit distinctive colour signatures—green for unripe, bright colours for fresh, and brown discolouration for rotten fruits.
+Despite this strong performance, kNN has many practical limitations. The approach requires storing all training images (50--200 MB), suffers from slow prediction times due to exhaustive comparisons with every training sample, and provides no learned representation beyond memorised examples. Furthermore, the fact that k=1 outperformed higher values (k=20 dropped to 63.8\%) suggests that while the training set provides good coverage with minimal class overlap, the method relies heavily on nearest-neighbour memorisation rather than generalisable feature learning. These drawbacks limit practical deployment despite strong headline accuracy.
+
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.6\linewidth]{baseline_knn_k_tuning.png}
+  \img[width=0.4\linewidth]{baseline_knn_k_tuning.png}
   \caption{kNN: effect of K on performance (expected trend).}
   \label{fig:knn-k}
 \end{figure}
 
 \subsection{HOG features + Linear Classifiers}
-Grayscale images at \(128\times128\) are converted to HOG features and classified with Logistic Regression or Linear SVM. Expected test accuracy is \textasciitilde60--75\% depending on configuration. This approach is fast and interpretable but discards color, which is crucial for ripeness.
+Our second baseline employs Histogram of Oriented Gradients (HOG), a  technique that extracts hand-crafted shape and texture features. HOG divides 128×128 grayscale images into small cells, computes gradient orientations at each pixel, and creates histograms of these orientations that are normalised across overlapping blocks. This produces a ~3,600-dimensional feature vector encoding edge patterns and local texture. We trained two linear classifiers on these features: Logistic Regression achieved 59.3\% accuracy, while Linear SVM reached 53.6\%.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.75\linewidth]{hog_linear_confusion_matrices.png}
-  \caption{HOG + Linear classifiers: confusion matrices (LogReg vs SVM).}
-  \label{fig:hog-conf}
-\end{figure}
+Both HOG-based models underperformed kNN by approximately 15\% due to a critical limitation: HOG operates on grayscale images, discarding all colour information. Since fruit ripeness is fundamentally colour-dependent, removing colour eliminates the primary discriminative signal. While HOG effectively captures shape patterns like spotting and bruising, these prove insufficient without colour context. However, HOG offers practical advantages over kNN—compact models (1.3 MB), fast prediction, and interpretable features. The comparison illuminates that kNN preserves colour at the cost of no abstraction, while HOG provides structured features but sacrifices critical colour information.
 
 \section{CNN Baseline}
-We trained a simple CNN in PyTorch with standard optimisation (cross-entropy loss; AdamW/SGD variants during tuning). Two reference runs are recorded below; final architecture/tuned hyperparameters will follow once sweeps complete.
 
-\subsection{Run 1: 5 epochs}
-Seed 42, batch size 32, image size 224, validation split 0.15.\newline
-Test loss: 0.678; Test accuracy: \textbf{72.3\%}.
+\subsection{Architecture and Configuration}
+To establish a performance baseline for our fruit ripeness classification task, we implemented a conventional convolutional neural network using PyTorch. (This will be referred to as \textbf{SimpleCNN} in the rest of the report.) The network comprises three convolutional blocks, with each block containing a 3×3 convolution, batch normalisation, ReLU activation, and 2×2 max pooling. The feature channels increase progressively from 32 to 64 to 128 across the three layers. A three-layer architecture was chosen as it provides sufficient depth to capture hierarchical visual features—early layers detect simple edges and textures, middle layers identify fruit-specific patterns, and deeper layers recognise complex ripeness indicators—whilst remaining computationally efficient and less prone to overfitting on our moderately-sized dataset. The convolutional blocks feed into a fully connected classifier with 256 hidden units and 50\% dropout, producing predictions for the nine classes (three fruit types × three ripeness states).
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.85\linewidth]{baseline_cnn_pytorch1.png}
-  \caption{CNN training curves (5 epochs).}
-  \label{fig:cnn-5ep}
-\end{figure}
+\subsection{Training Longer Unlocks Performance}
 
-\subsection{Run 2: 20 epochs}
-Same setup, extended training.\newline
-Per-epoch metrics show steady improvements in validation accuracy from 0.61 to 0.81.\newline
-Final test loss: 0.380; Test accuracy: \textbf{84.5\%}.
+We began by exploring the effect of training for larger number of epochs (i.e. training for longer) to see the effect this would have.\\
+
+The first model, trained for 5 epochs, achieved 72.3\% test accuracy—surpassing our non-CNN baseline and confirming that even limited training enabled effective feature extraction. Increasing the training duration to 20 epochs improved accuracy to 84.5\%, with training curves showing continued learning and no signs of convergence. Based on this, we trained a final model for 40 epochs, reaching 92.96\% test accuracy. The steady progression in accuracy (72.3\% → 84.5\% → 92.96\%) indicates that while the CNN architecture is well-suited to the task, it requires sufficient training iterations to capture the nuanced visual differences between fruit ripeness states. These results establish 40 epochs as an appropriate training duration for this baseline architecture and dataset, forming a solid reference point for subsequent model comparisons.
+
 
 \begin{figure}[H]
-  \centering
-  \includegraphics[width=0.85\linewidth]{baseline_cnn_pytorch2.png}
-  \caption{CNN training curves (20 epochs).}
-  \label{fig:cnn-20ep}
+    \centering
+    \img[width=0.85\linewidth]{Baseline40.png}
+    \caption{Baseline CNN training curves (40 epochs).}
+    \label{fig:placeholder}
 \end{figure}
 
-\section{Hyperparameter Tuning (Methodology)}
-Hyperparameter tuning is orchestrated in a Colab-friendly notebook using Weights\,&\,Biases (W\&B) sweeps. The objective maximises validation macro-F1 with early stopping. The search space spans:
+The hyperparameters used in all three training runs were chosen to reflect a standard choice for such a task. The Adam optimiser with a learning rate of $1\mathrm{e}{-4}$ was selected for its robust performance on vision tasks. We used a batch size of 32, split the data into 85\% training, 15\% validation and applied data augmentation (random flips, rotations, and colour jittering) to improve generalisation. All experiments used a fixed random seed of 42 for reproducibility.
+
+
+\section{Hyperparameter Tuning}
+\subsection{Methodology}
+We broadened our search beyond the three-layer \textbf{SimpleCNN} and adopted \textbf{macro-F1} as the primary selection metric (rather than accuracy) to weight classes equally. Hyper-parameter tuning was orchestrated in a Google Colab notebook using Weights\,&\,Biases (W\&B) sweeps. Each run trained for 15 epochs (chosen for a balance between convergence and compute). The objective maximised \emph{validation} macro-F1. The search space spans:
 \begin{itemize}
-  \item Architectures: simple CNN, ResNet-18, MobileNetV3-Small, EfficientNet-B0 (with optional pretrained weights and backbone freezing for ablations).\footnote{Transfer learning is explored methodologically but final submission will adhere to assignment constraints (no fine-tuning of pretrained backbones) unless clarified.}
-  \item Optimisers: AdamW/Adam/SGD; scheduler: cosine or ReduceLROnPlateau; label smoothing; gradient clipping.
-  \item Data: image size, batch size, augmentation strengths (flip, rotation, color jitter, random erasing).
+  \item Architectures: simple CNN, ResNet-18, MobileNetV3-Small, EfficientNet-B0. All reported results are trained from scratch (no pretrained fine-tuning).
+  \item Optimisers: AdamW/Adam/SGD; scheduler: cosine; label smoothing; gradient clipping.
+  \item Data: image size, batch size, augmentation strengths (flip, rotation, colour jitter, random erasing).
   \item Regularisation: dropout and weight decay.
 \end{itemize}
-Results are pending while the tuning runs execute; the best configuration and full metrics table will be inserted here.
+
+\subsection{Architectures (brief)}
+\textbf{SimpleCNN}\; A lightweight baseline with three convolution\,+\,pooling blocks (32/64/128 channels) and a small fully connected head. It learns colour and texture features directly without specialised blocks, trading ultimate accuracy for simplicity and speed.
+
+\textbf{ResNet-18}\; A residual network with identity shortcuts that bypass one or more layers, enabling stable optimisation of deeper models via residual learning. The 18-layer variant uses BasicBlocks with two 3\,\(\times\)\,3 convolutions per block and a final linear classifier.\footnote{He et al., Deep Residual Learning for Image Recognition, arXiv:1512.03385}
+
+\textbf{MobileNetV3-Small}\; An efficient architecture for mobile settings built from inverted residual bottlenecks with depthwise separable convolutions, squeeze-and-excitation (SE), and the \textit{h-swish}/\textit{h-sigmoid} activations. It balances accuracy and latency with a compact parameter footprint.\footnote{Howard et al., Searching for MobileNetV3, arXiv:1905.02244}
+
+\textbf{EfficientNet-B0}\; A family baseline that uses MBConv (inverted residual + depthwise separable) blocks with SE; the family is scaled using compound width/depth/resolution multipliers discovered via NAS. B0 is the base configuration.\footnote{Tan and Le, EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks, arXiv:1905.11946}
+
+\subsection{Results and Selection}
+We analysed \textbf{31 runs} (24 completed, i.e. ran all the way to 15 epochs and tested on the test set) across the four architectures. Model selection used validation macro-F1; we report corresponding test metrics for finished runs.
+
+\paragraph{Top configurations (test set).}
+\begin{center}
+\begin{tabular}{lcccccccc}
+\toprule
+Arch & LR & WD & Batch & Dropout & CJ & RE & Test macro-F1 \\
+\midrule
+resnet18 & 3.65e-4 & 1.15e-6 & 16 & 0.444 & 0.15 & 0.00 & 0.985 \\
+effnet-b0 & 4.34e-4 & 5.32e-3 & 32 & 0.164 & 0.30 & 0.25 & 0.982 \\
+resnet18 & 4.92e-5 & 8.42e-6 & 16 & 0.517 & 0.15 & 0.25 & 0.960 \\
+effnet-b0 & 1.71e-4 & 1.36e-4 & 32 & 0.539 & 0.15 & 0.10 & 0.960 \\
+effnet-b0 & 1.21e-4 & 3.85e-6 & 16 & 0.116 & 0.30 & 0.00 & 0.952 \\
+mobilenetv3-s & 3.84e-4 & 1.31e-3 & 48 & 0.178 & 0.00 & 0.00 & 0.944 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+ResNet-18 is the strongest (best test macro-F1 0.985; test accuracy 0.988), closely followed by EfficientNet-B0 (best macro-F1 0.982). SimpleCNN sweeps now peak around macro-F1 $\approx 0.901$, narrowing the gap to MobileNetV3-Small (best $\approx 0.944$).
+
+\paragraph{Architecture-level outcomes.}
+\begin{itemize}
+  \item \textbf{ResNet-18} (4 runs): mean test macro-F1 0.959; mean test accuracy 0.966.
+  \item \textbf{EfficientNet-B0} (5 runs): mean test macro-F1 0.938; mean test accuracy 0.946.
+  \item \textbf{MobileNetV3-Small} (4 runs): mean test macro-F1 0.885; mean test accuracy 0.899.
+  \item \textbf{SimpleCNN} (11 runs): mean test macro-F1 0.854 ($\sigma\!\approx\!0.044$); mean test accuracy 0.872; best macro-F1 $\approx\!0.901$.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{0.48\linewidth}
+    \centering
+    \img[width=\linewidth]{val_macro_f1_for_each_arch_in_training.png}
+    \caption{Validation macro-F1}
+    \label{fig:val_macro_f1}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.48\linewidth}
+    \centering
+    \img[width=\linewidth]{val_accuracy_for_each_arch_in_training.png}
+    \caption{Validation accuracy}
+    \label{fig:val_accuracy}
+  \end{subfigure}
+  \caption{Validation macro-F1 and accuracy for each architecture across epochs. Shaded error bars indicate standard error.}
+  \label{fig:val_metrics_for_each_arch_in_training}
+\end{figure}
+
+
+The curves above are highly correlated: across architectures, validation accuracy and macro-F1 move together. This suggests relatively balanced class support and similar per-class performance; nonetheless, we use macro-F1 for model selection to guard against any latent imbalance.
+
+
+\paragraph{Hyperparameter insights.}
+\begin{itemize}
+  \item \textbf{ResNet-18:} conservative LR ($\leq$5e-4) and minimal WD ($\leq$1e-5) work well; higher dropout (0.45--0.55) and limited random erasing add regularisation.
+  \item \textbf{EfficientNet-B0:} LR 1e-4--4e-4 with colour jitter up to 0.3 and random erasing $\leq$0.25; batch 32 outperforms 16.
+  \item \textbf{MobileNetV3-Small:} larger batches ($\geq$48) with little to no colour jitter; AdamW LR $\approx$3.8e-4 performed best.
+  \item \textbf{SimpleCNN:} parameter importance ranks colour jitter highest (positive), with dropout trending negative beyond $\approx$0.4; moderate random erasing (0.1--0.25) helps.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \img[width=0.7\linewidth]{param_importance_basic_cnn.png}
+  \caption{Parameter importance for SimpleCNN sweep (macro-F1).}
+  \label{fig:param-importance-simplecnn}
+\end{figure}
+
+\paragraph{Selection.} We select a \textbf{from-scratch ResNet-18} (run: \emph{still-sweep-1}) with LR 3.65e-4, weight decay 1.15e-6, batch 16, dropout 0.444, colour jitter 0.15, random erasing 0.00. This configuration achieved validation macro-F1 0.979 and test macro-F1 0.985 (test accuracy 0.988).
+
+\begin{figure}[H]
+  \centering
+  \img[width=0.8\linewidth]{results/figures/roc_sweep.png}
+  \caption{Macro-averaged ROC curves across the sweep. The selected run (still-sweep-1) appears in red; other runs are shown in grey.}
+  \label{fig:best-roc}
+\end{figure}
 
 \section{Experimental Setup}
 \textbf{Frameworks:} PyTorch and torchvision.\newline
@@ -120,41 +198,88 @@ Results are pending while the tuning runs execute; the best configuration and fu
 
 \section{Results Summary}
 \begin{center}
-\begin{tabular}{lcc}
+\begin{tabular}{lccc}
 \toprule
-Model & Accuracy & Notes \\
+Model & Test macro-F1 & Test Accuracy & Notes \\
 \midrule
-Random (9 classes) & 11.1\% & Reference \\
-HOG + Linear & 60--75\% & Expected range \\
-kNN (raw RGB, K=1) & 74.4\% & Baseline \\
-CNN (20 epochs) & 84.5\% & Current best \\
+Random (9 classes) & 0.111& 11.1\% & Reference \\
+HOG + Logistic & 0.565& 59.3\% & Grayscale features\\
+HOG + Linear SVM & 0.511& 53.6\% & Grayscale features\\
+kNN (raw RGB, K=1) & 0.743& 74.4\% & Strong colour signal \\
+\midrule
+\multicolumn{4}{l}{\textit{Deep Learning Models: 3 Layer CNN, Default Hyper-parameters}} \\[2pt]
+\midrule
+CNN baseline (5 epochs) & -- & 72.3\% & Three-block SimpleCNN \\
+CNN baseline (20 epochs) & -- & 84.5\% & Three-block SimpleCNN \\
+CNN baseline (40 epochs) & -- & 92.96\% & Three-block SimpleCNN \\
+\midrule
+\multicolumn{4}{l}{\textit{Deep Learning Models: Hyper-parameter Tuned}} \\[2pt]
+\midrule
+SimpleCNN (15 epochs) & 0.901 & 91.6\% & Best Hyper-parameters \\
+Mobilenet-v3-small & 0.944 & 95.3\% & Best Hyper-parameters \\
+EfficientNet-B0 (15 epochs) & 0.982 & 98.5\% & Best Hyper-parameters \\
+ResNet-18 (15 epochs) & \textbf{0.985} & \textbf{98.8\%} & Best Hyper-parameters \\
 \bottomrule
 \end{tabular}
 \end{center}
-Macro-F1 and per-class metrics will be added alongside CNN confusion matrices.
+Per-class precision/recall/F1 and confusion matrices for the selected model will be added.
 
 \section{Analysis}
-\textbf{Baselines:} kNN outperforms HOG because color strongly signals ripeness, whereas HOG discards color by design.\newline
-\textbf{CNN:} Learns color and texture jointly, outperforming raw-pixel matching by ~10 points. Longer training improves validation and test performance; regularisation and augmentation are expected to further stabilise results.\newline
-\textbf{Error patterns:} We expect confusion between adjacent ripeness stages (e.g., ripe vs slightly unripe/rotting). We will quantify this with CNN confusion matrices and a classification report.
+\textbf{Baselines:} kNN outperforms HOG because colour strongly signals ripeness, whereas HOG discards colour by design.\newline
+\textbf{CNN vs baselines:} Learned features that combine colour and texture outperform raw-pixel matching by a large margin; the selected ResNet-18 adds $\approx$24 points of absolute accuracy over kNN.\newline
+\textbf{Hyperparameters:} Stronger regularisation (dropout $>\!0.4$) benefits ResNet/EfficientNet; SimpleCNN gains most from moderate colour jitter and restrained dropout.\newline
+\textbf{Error patterns:} Confusions are expected between adjacent ripeness stages (e.g., ripe vs. slightly unripe/rotting). We summarise this with the aggregated confusion matrix (Figure~\ref{fig:confusion_matrix_all_hyperparam_runs}) and will add a classification report for the selected model.\\
+\textbf{ROC curves:} Figure~\ref{fig:best-roc} overlays per-class ROC curves for all runs, with the selected configuration highlighted. Its near-vertical rise confirms strong performance while the log-scaled FPR axis reveals subtle differences among high-performing runs.\\
+
+Across runs, the largest errors occur for the \emph{unripe} classes across fruits. This aligns with the data (Figure~\ref{fig:dataset-sample-images}): many unripe examples show small fruits on branches with more background and weaker colour cues. Those factors reduce signal-to-noise and make classification harder, explaining the consistent pattern across models.
+
+
+\begin{figure}[H]
+  \centering
+  \img[width=0.8\linewidth]{confusion_matrix_all_hyperparam_runs.png}
+  \caption{Confusion matrix across all runs in the hyper-parameter tuning.}
+  \label{fig:confusion_matrix_all_hyperparam_runs}
+\end{figure}
+
+
 
 \section{Reproducibility}
-See \texttt{README.md} for environment setup and dataset download instructions. Notebooks under \texttt{training notebooks/} reproduce baselines and the CNN experiments. Final test predictions and checkpoints will be included in the submission package.
+See \texttt{README.md} for environment setup and dataset download instructions. Notebooks under \texttt{training notebooks/} reproduce baselines and the CNN experiments;\\ \texttt{training notebooks/cnn/hyperparam\_tuning/} contains the W\&B hyper-parameter sweep setup and analysis. Final test predictions and the best checkpoint for the selected model will be included in the submission package.
 
-\section{Remaining Work}
-We are mid-way through tuning. Outstanding items:\vspace{-0.3em}
+\section*{References}
 \begin{itemize}
-  \item Run W\&B sweep; select the best non-pretrained CNN configuration per assignment constraints.
-  \item Generate CNN confusion matrix, per-class precision/recall/F1, and classification report.
-  \item Add ROC/PR curves (one-vs-rest) for the CNN.
-  \item Perform ablations: augmentation on/off, dropout/weight decay sensitivity.
-  \item Export final test predictions and save the best checkpoint.
-  \item Finalise report sections with tuned results and error analysis.
-  \item Prepare 5-minute presentation slides aligned to the marking rubric.
-  \item Package submission ZIP with report, code, data sample, and slides.
+  \item leftin. ``Fruit Ripeness: Unripe, Ripe, and Rotten'' (Kaggle dataset; updated 4 months ago). URL: \href{https://www.kaggle.com/datasets/leftin/fruit-ripeness-unripe-ripe-and-rotten}{https://www.kaggle.com/datasets/leftin/fruit-ripeness-unripe-ripe-and-rotten}
+  \item He, K.; Zhang, X.; Ren, S.; Sun, J. ``Deep Residual Learning for Image Recognition.'' arXiv:1512.03385.
+  \item Howard, A. et al. ``Searching for MobileNetV3.'' arXiv:1905.02244.
+  \item Tan, M.; Le, Q. ``EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks.'' arXiv:1905.11946.
 \end{itemize}
 
 \section*{Acknowledgements}
-We acknowledge use of PyTorch, torchvision, scikit-learn, scikit-image, and Weights\,&\,Biases. Baseline methodology and configuration details are documented in the repository under \texttt{training notebooks/}.
+We acknowledge use of PyTorch, torchvision, scikit-learn, scikit-image, and Weights and Biases. Baseline methodology and configuration details are documented in the repository under \texttt{training notebooks/}.
+
+\appendix
+\section{Dataset}
+\begin{table}[h]
+\centering
+\caption{Dataset Split Across 9 Fruit Ripeness Classes}
+\label{tab:dataset_split}
+\begin{tabular}{lcccc}
+\hline
+\textbf{Class} & \textbf{Train} & \textbf{Validation} & \textbf{Test} & \textbf{Total} \\
+\hline
+Fresh Apples & 1,360 & 240 & 340 & 1,940 \\
+Fresh Banana & 1,478 & 261 & 390 & 2,129 \\
+Fresh Oranges & 1,544 & 273 & 391 & 2,208 \\
+Rotten Apples & 1,541 & 272 & 400 & 2,213 \\
+Rotten Banana & 1,796 & 317 & 451 & 2,564 \\
+Rotten Oranges & 1,595 & 282 & 403 & 2,280 \\
+Unripe Apple & 1,464 & 259 & 345 & 2,068 \\
+Unripe Banana & 1,545 & 273 & 363 & 2,181 \\
+Unripe Orange & 1,461 & 258 & 361 & 2,080 \\
+\hline
+\textbf{Total} & \textbf{13,784} & \textbf{2,433} & \textbf{3,246} & \textbf{19,463} \\
+\hline
+\end{tabular}
+\end{table}
 
 \end{document}
